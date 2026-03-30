@@ -1,0 +1,523 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>专注小屋 | 实时专注记录</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div class="hero-copy">
+        <span class="eyebrow">Focus Compass Live</span>
+        <p class="hero-kicker">实时截图与报告输出</p>
+        <h1>设定专注时长后开始共享屏幕，系统会边截图边分析，结束后直接给你一份报告。</h1>
+        <p class="hero-intro">
+          你只需要写下当前目标、选择本轮专注时长，然后共享你的工作窗口或屏幕。系统会在第一张截图之后持续衔接后续采集，每完成一张分析就继续抓下一张画面，避免等到最后才开始处理。
+        </p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#live-session">开始实时专注记录</a>
+          <a class="button button-secondary" href="#manual-upload">补充上传历史截图</a>
+        </div>
+        <div class="status-row">
+          <div class="status-chip {{ 'ready' if runtime['ocr_ready'] else 'warning' }}">
+            {{ '识别服务已就绪' if runtime['ocr_ready'] else '识别服务待配置' }}
+          </div>
+          <div class="status-chip ready">连续采集</div>
+          <div class="status-chip ready">边采集边评分</div>
+        </div>
+        <p class="status-note">
+          {% if runtime['ocr_ready'] %}
+            推荐共享你当前真正工作的窗口，而不是这个网页本身，这样报告会更贴近真实专注过程。
+          {% else %}
+            当前识别服务还没准备好，建议先完成配置，再开始实时记录。
+          {% endif %}
+        </p>
+
+        <div class="promise-grid">
+          <article class="promise-card">
+            <strong>采集中就开始分析</strong>
+            <p>不是先攒一批截图再统一处理，而是每张到来就进入评分流程。</p>
+          </article>
+          <article class="promise-card">
+            <strong>结束就能看报告</strong>
+            <p>因为中途已经持续分析，所以专注时长结束后不用再额外等待很久。</p>
+          </article>
+          <article class="promise-card">
+            <strong>适合长期复盘</strong>
+            <p>更适合完整记录一段专注过程，而不是只回头补传零散截图。</p>
+          </article>
+        </div>
+      </div>
+
+      <div class="hero-stage">
+        <article class="stage-card stage-card-primary">
+          <span class="stage-label">这次你会得到</span>
+          <strong>一份完整时段的实时专注报告</strong>
+          <p>系统会记录整段时长里的状态变化、偏离场景和建议，而不是只看某几张静态截图。</p>
+          <div class="stage-tags">
+            <span>设时长</span>
+            <span>自动截图</span>
+            <span>即时评分</span>
+          </div>
+        </article>
+
+        <div class="stage-grid">
+          <article class="stage-card compact">
+            <span class="stage-label">采集节奏</span>
+            <strong>分析完上一张就继续下一张</strong>
+            <p>不再预设固定秒数，而是让截图和分析自然衔接，优先缩短报告等待时间。</p>
+          </article>
+          <article class="stage-card compact accent">
+            <span class="stage-label">适合谁用</span>
+            <strong>自习、写作、资料整理、检索对比</strong>
+            <p>只要你的任务会持续停留在设备上，这套模式就比手动上传更顺手。</p>
+          </article>
+          <article class="stage-card compact soft">
+            <span class="stage-label">结果呈现</span>
+            <strong>边更新总览，边积累最终报告</strong>
+            <p>采集过程里能看到实时趋势，结束后会自动整理成完整报告。</p>
+          </article>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-grid">
+      <section id="live-session" class="panel live-panel">
+        <div class="panel-head">
+          <div>
+            <span class="section-label">实时模式</span>
+            <h2>设置专注时长，开始连续截图和同步评分</h2>
+            <p>浏览器会请求你选择要共享的屏幕、窗口或标签页。开始后系统会立即截取第一张，之后每完成一张分析就继续采下一张。</p>
+          </div>
+          <div class="panel-pulse">
+            <span>当前计划</span>
+            <strong>{{ runtime["session_default_duration_minutes"] }} 分钟默认时长</strong>
+            <small>单次最短 {{ runtime["session_min_duration_minutes"] }} 分钟，最长 {{ runtime["session_max_duration_minutes"] }} 分钟</small>
+          </div>
+        </div>
+
+        <div id="liveMessage" class="message info hidden"></div>
+
+        <div class="form-grid live-grid">
+          <div class="form-main">
+            <label>
+              <span>这次想专注完成什么</span>
+              <textarea id="liveGoal" rows="4" placeholder="{{ runtime['goal_placeholder'] }}">{{ selected_goal }}</textarea>
+            </label>
+
+            <p class="field-note">建议写成这次真正要完成的任务，例如“整理旅行预算并筛选酒店”，这样实时评分会更贴近你的实际状态。</p>
+
+            <div class="goal-help-caption">本轮专注设置</div>
+            <div class="inline-form live-settings-row">
+              <label class="duration-field">
+                <span>专注时长（分钟）</span>
+                <input id="liveDuration" type="number" min="{{ runtime['session_min_duration_minutes'] }}" max="{{ runtime['session_max_duration_minutes'] }}" step="1" value="{{ runtime['session_default_duration_minutes'] }}">
+              </label>
+              <article class="capture-kpi">
+                <span>采集模式</span>
+                <strong id="expectedFrames">连续采集</strong>
+                <p>不再预设固定间隔，而是在时长内持续衔接截图和分析</p>
+              </article>
+              <article class="capture-kpi soft">
+                <span>推进方式</span>
+                <strong>分析后立刻继续</strong>
+                <p>上一张截图处理完成后，会马上继续抓取下一张</p>
+              </article>
+            </div>
+
+            <div class="goal-help-caption">目标写法参考</div>
+            <div class="goal-help-grid">
+              {% for example in runtime["goal_examples"] %}
+                <article class="goal-help-card">
+                  <div class="goal-help-head">
+                    <strong>写法 {{ loop.index }}</strong>
+                    <span>参考</span>
+                  </div>
+                  <p>{{ example }}</p>
+                </article>
+              {% endfor %}
+            </div>
+
+            <div class="live-action-row">
+              <button type="button" id="startSessionButton">开始实时专注记录</button>
+              <button type="button" id="stopSessionButton" class="button-secondary" disabled>结束并输出报告</button>
+            </div>
+
+            <div class="input-hint">
+              浏览器会先请求屏幕共享权限。为了避免采到网页自身，推荐直接选择你要工作的应用窗口、浏览器标签页或整个屏幕。
+            </div>
+          </div>
+
+          <aside class="form-aside">
+            <article class="aside-card">
+              <span class="aside-label">实时流程</span>
+              <h3>你会按这个顺序走完一轮</h3>
+              <ul class="aside-list">
+                <li>先写目标和专注时长</li>
+                <li>开始共享要工作的窗口或屏幕</li>
+                <li>系统连续截图并同步评分</li>
+                <li>结束后直接生成整段报告</li>
+              </ul>
+            </article>
+            <article class="aside-card accent">
+              <span class="aside-label">为什么更快</span>
+              <h3>采集过程中已经在持续处理</h3>
+              <p>每一张截图上传后都会立即进入 OCR 和评分流程，所以不会把所有分析都堆到结束后才开始。</p>
+            </article>
+            <article class="aside-card soft">
+              <span class="aside-label">开始前提醒</span>
+              <h3>{{ '现在可以开始共享屏幕' if runtime['ocr_ready'] else '开始前先检查识别服务' }}</h3>
+              <p>
+                {% if runtime['ocr_ready'] %}
+                  如果你准备好了，就直接点击开始。系统会在记录过程中持续更新总览，不需要你手动刷新页面。
+                {% else %}
+                  当前识别服务还没准备好，建议先完善环境配置，再开始实时记录，以免只采到图片却无法及时输出评分。
+                {% endif %}
+              </p>
+            </article>
+          </aside>
+        </div>
+
+        <div class="live-status-grid">
+          <article class="live-status-card">
+            <div class="live-card-head">
+              <span class="section-label">会话状态</span>
+              <strong id="sessionStateLabel">尚未开始</strong>
+            </div>
+            <div class="session-progress-meta">
+              <div><span>已进行</span><strong id="elapsedTime">00:00</strong></div>
+              <div><span>剩余</span><strong id="remainingTime">--:--</strong></div>
+              <div><span>完成度</span><strong id="progressPercent">0%</strong></div>
+            </div>
+            <div class="progress-track"><span id="sessionProgressBar" style="width: 0%"></span></div>
+          </article>
+
+          <article class="live-status-card">
+            <div class="live-card-head">
+              <span class="section-label">采集方式</span>
+              <strong id="capturePlanLabel">等待开始</strong>
+            </div>
+            <div class="session-progress-meta">
+              <div><span>已采集</span><strong id="capturedFrames">0</strong></div>
+              <div><span>采集模式</span><strong id="plannedFrames">连续采集</strong></div>
+              <div><span>推进方式</span><strong id="nextCaptureIn">分析完成后继续</strong></div>
+            </div>
+          </article>
+
+          <article class="live-status-card">
+            <div class="live-card-head">
+              <span class="section-label">最新分析</span>
+              <strong id="latestStatusLabel">等待第一张截图</strong>
+            </div>
+            <div class="session-progress-meta">
+              <div><span>最新分数</span><strong id="latestScore">--</strong></div>
+              <div><span>最近处理耗时</span><strong id="latestProcessing">--</strong></div>
+              <div><span>当前场景</span><strong id="latestContext">--</strong></div>
+            </div>
+            <p id="latestReason" class="status-note">开始后这里会持续更新最近一张截图的判断结果。</p>
+          </article>
+
+          <article class="live-status-card preview-surface">
+            <div class="live-card-head">
+              <span class="section-label">最近截图预览</span>
+              <strong id="previewLabel">尚未采集</strong>
+            </div>
+            <div class="preview-frame">
+              <img id="capturePreview" alt="最近一次实时截图预览" class="hidden">
+              <div id="previewPlaceholder" class="preview-placeholder">开始后会在这里显示最近一次实时截图</div>
+            </div>
+            <video id="captureVideo" class="capture-probe" autoplay muted playsinline></video>
+            <canvas id="captureCanvas" class="capture-probe"></canvas>
+          </article>
+        </div>
+      </section>
+
+      <section id="live-report" class="panel report-panel hidden">
+        <div class="panel-head">
+          <div>
+            <span class="section-label">实时报告</span>
+            <h2>这段专注过程，系统正在边采集边整理</h2>
+            <p id="liveReportMeta">开始后，系统会随着截图不断更新总览结果。</p>
+          </div>
+          <div id="liveReportTags" class="tag-list"></div>
+        </div>
+
+        <div id="liveSummaryGrid" class="summary-grid"></div>
+
+        <div class="report-duo">
+          <article class="insight-card narrative-card">
+            <div class="card-header">
+              <h3>系统当前最常捕捉到这些任务线索</h3>
+              <span class="mini-pill">任务线索</span>
+            </div>
+            <p>这些词会随着采集继续更新，帮助你判断当前画面是不是一直围绕同一件事。</p>
+            <div id="liveKeywords" class="tag-list"></div>
+            <div id="liveMetricsGrid" class="mini-metrics"></div>
+          </article>
+
+          <article class="insight-card suggestion-card">
+            <div class="card-header">
+              <h3>系统给你的实时建议</h3>
+              <span class="mini-pill">行动建议</span>
+            </div>
+            <ul id="liveSuggestions" class="suggestion-list"></ul>
+          </article>
+        </div>
+      </section>
+
+      <section id="live-details" class="panel detail-panel hidden">
+        <div class="panel-head">
+          <div>
+            <span class="section-label">逐张记录</span>
+            <h2>整段专注时长里的截图明细</h2>
+            <p>每采集一张新截图，这里的明细都会继续累积，结束后直接形成完整记录。</p>
+          </div>
+        </div>
+        <div id="liveDetailList" class="detail-list"></div>
+      </section>
+
+      <section id="manual-upload" class="panel form-panel secondary-panel">
+        <div class="panel-head">
+          <div>
+            <span class="section-label">补充模式</span>
+            <h2>如果你想补传一段历史截图，也可以继续用手动上传</h2>
+            <p>实时模式更适合未来的一整段专注记录，手动上传则适合补做历史截图分析或调试识别效果。</p>
+          </div>
+          <div class="panel-pulse">
+            <span>补传建议</span>
+            <strong>一次 5 到 20 张连续截图</strong>
+            <small>支持 {{ runtime['supported_extensions'] }}</small>
+          </div>
+        </div>
+
+        {% if error %}
+          <div class="message error">{{ error }}</div>
+        {% endif %}
+
+        <form action="{{ url_for('analyze') }}" method="post" enctype="multipart/form-data" class="focus-form">
+          <div class="form-grid">
+            <div class="form-main">
+              <label>
+                <span>这次想回顾什么任务</span>
+                <textarea name="goal" rows="4" required placeholder="{{ runtime['goal_placeholder'] }}">{{ selected_goal }}</textarea>
+              </label>
+
+              <p class="field-note">如果你已经错过了实时记录，依然可以把一段历史截图按顺序补传进来。</p>
+
+              <div class="goal-help-caption">上传历史截图</div>
+              <label>
+                <span>选择截图文件</span>
+                <input type="file" name="screenshots" accept="{{ runtime['supported_extensions']|replace(', ', ',') }}" multiple required>
+              </label>
+
+              <div class="input-hint">
+                建议按时间顺序上传连续截图，这样报告会更容易还原当时的状态变化。
+              </div>
+            </div>
+
+            <aside class="form-aside">
+              <article class="aside-card">
+                <span class="aside-label">什么时候用它</span>
+                <h3>更适合补传和复盘旧记录</h3>
+                <ul class="aside-list">
+                  <li>已经有一组历史截图想快速回顾</li>
+                  <li>想测试某一类页面会被怎么识别</li>
+                  <li>暂时不方便开启屏幕共享</li>
+                </ul>
+              </article>
+              <article class="aside-card soft">
+                <span class="aside-label">输出内容</span>
+                <h3>仍然会给出完整报告</h3>
+                <p>总览、关键词、建议和逐张明细都会继续保留，和实时模式的报告结构一致。</p>
+              </article>
+            </aside>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit">分析这组历史截图</button>
+            <p>适合补做复盘，也适合对比实时模式和手动上传模式的差异。</p>
+          </div>
+        </form>
+      </section>
+
+      {% if report %}
+        <section id="report" class="panel report-panel">
+          <div class="panel-head">
+            <div>
+              <span class="section-label">补传结果</span>
+              <h2>这组历史截图，已经帮你整理好了</h2>
+              <p>{{ generated_at.strftime('%Y-%m-%d %H:%M:%S') }} 生成，本次目标是“{{ report["summary"]["goal_label"] }}”。</p>
+            </div>
+            <div class="tag-list">
+              <span class="tag">已分析 {{ report["summary"]["valid_images"] }} 张</span>
+              <span class="tag">专注占比 {{ report["summary"]["focus_ratio"] }}%</span>
+            </div>
+          </div>
+
+          <div class="summary-grid">
+            <article class="summary-card score-card">
+              <span>平均专注状态</span>
+              <strong>{{ report["summary"]["avg_focus_score"] }}</strong>
+              <p>分数越高，说明这一段记录越稳定地围绕当前目标展开。</p>
+              <div class="meter"><span style="width: {{ report['summary']['avg_focus_score'] }}%"></span></div>
+            </article>
+            <article class="summary-card">
+              <span>保持专注的时间</span>
+              <strong>{{ report["summary"]["focus_ratio"] }}%</strong>
+              <p>专注 {{ report["summary"]["focus_count"] }} 张，轻微偏离 {{ report["summary"]["drift_count"] }} 张，分心 {{ report["summary"]["distract_count"] }} 张。</p>
+            </article>
+            <article class="summary-card value-card">
+              <span>最常见的投入场景</span>
+              <strong>{{ report["summary"]["top_context"] }}</strong>
+              <p>这通常代表你更容易进入状态的内容类型或页面氛围。</p>
+            </article>
+            <article class="summary-card value-card">
+              <span>最需要注意的偏离场景</span>
+              <strong>{{ report["summary"]["top_distractor"] }}</strong>
+              <p>先把这类偏离场景梳理清楚，整体表现通常会更稳定。</p>
+            </article>
+            <article class="summary-card">
+              <span>和目标的贴合度</span>
+              <strong>{{ report["summary"]["avg_relevance_score"] }}</strong>
+              <p>贴合度越高，说明截图内容越接近你一开始写下的任务。</p>
+            </article>
+            <article class="summary-card">
+              <span>画面识别清晰度</span>
+              <strong>{{ report["summary"]["avg_ocr_quality"] }}</strong>
+              <p>截图越清晰，报告越适合拿来复盘细节和定位问题。</p>
+            </article>
+          </div>
+
+          <div class="report-duo">
+            <article class="insight-card narrative-card">
+              <div class="card-header">
+                <h3>这组记录里，系统更常捕捉到这些任务信号</h3>
+                <span class="mini-pill">任务线索</span>
+              </div>
+              <p>这些关键词最能代表你这次任务的核心内容，也是在报告里反复出现的专注线索。</p>
+              <div class="tag-list">
+                {% for keyword in report["summary"]["keywords"] %}
+                  <span class="tag">{{ keyword }}</span>
+                {% endfor %}
+              </div>
+              <div class="mini-metrics">
+                <div><span>目标贴合</span><strong>{{ report["summary"]["avg_relevance_score"] }}</strong></div>
+                <div><span>画面清晰</span><strong>{{ report["summary"]["avg_ocr_quality"] }}</strong></div>
+                <div><span>重点命中</span><strong>{{ report["summary"]["avg_strong_hit_score"] }}</strong></div>
+                <div><span>页面结构</span><strong>{{ report["summary"]["avg_structure_score"] }}</strong></div>
+              </div>
+            </article>
+
+            <article class="insight-card suggestion-card">
+              <div class="card-header">
+                <h3>下一次开始前，可以先做这几件事</h3>
+                <span class="mini-pill">行动建议</span>
+              </div>
+              <ul class="suggestion-list">
+                {% for suggestion in report["summary"]["suggestions"] %}
+                  <li>{{ suggestion }}</li>
+                {% endfor %}
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel detail-panel">
+          <div class="panel-head">
+            <div>
+              <span class="section-label">逐张回顾</span>
+              <h2>如果你想看得更细，这里可以逐张回放</h2>
+              <p>每张截图都会展示状态判断和原因，方便你定位是哪一刻开始偏离、又是因为什么偏离。</p>
+            </div>
+          </div>
+
+          <div class="detail-list">
+            {% for item in report["items"] %}
+              <article class="detail-card">
+                <div class="detail-top">
+                  <div>
+                    <h3>{{ item["filename"] }}</h3>
+                    <p>{{ item["category_label"] }} · {{ item["status"] }}</p>
+                  </div>
+                  <div class="score-badge {{ 'focus' if item['status'] == '专注' else 'warn' if item['status'] == '轻微偏离' else 'danger' }}">
+                    {{ item["focus_score"] }}
+                  </div>
+                </div>
+                <div class="detail-metrics">
+                  <span>贴合度 {{ item["relevance_score"] }}</span>
+                  <span>清晰度 {{ item["ocr_quality_score"] }}</span>
+                  <span>重点命中 {{ item["strong_hit_score"] }}</span>
+                  <span>关键词 {{ item["keyword_hit_score"] }}</span>
+                  <span>结构信号 {{ item["structure_score"] }}</span>
+                  <span>连续稳定 {{ item["window_consistency_score"] }}</span>
+                </div>
+                {% if item["cache_hit"] or item["used_fallback"] %}
+                  <div class="detail-flags">
+                    {% if item["cache_hit"] %}
+                      <span class="tag">结果复用</span>
+                    {% endif %}
+                    {% if item["used_fallback"] %}
+                      <span class="tag">备用识别</span>
+                    {% endif %}
+                  </div>
+                {% endif %}
+                <p class="detail-reason">{{ item["decision_reason"] }}</p>
+                {% if item["fallback_reason"] %}
+                  <p class="detail-reason subtle">{{ item["fallback_reason"] }}</p>
+                {% endif %}
+                {% if item["matched_keywords"] %}
+                  <div class="tag-list compact">
+                    {% for keyword in item["matched_keywords"] %}
+                      <span class="tag">{{ keyword }}</span>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+                <details>
+                  <summary>查看识别文本</summary>
+                  <pre>{{ item["ocr_text"] if item["ocr_text"] else '当前图片没有提取到足够清晰的文本内容。' }}</pre>
+                </details>
+              </article>
+            {% endfor %}
+          </div>
+        </section>
+      {% else %}
+        <section class="panel pathway-panel">
+          <div class="panel-head">
+            <div>
+              <span class="section-label">实时模式三步</span>
+              <h2>现在的主流程已经是实时截图加报告输出</h2>
+              <p>如果你准备开始一段新的专注过程，直接使用上面的实时模式就可以，不需要先手动准备截图。</p>
+            </div>
+          </div>
+          <div class="pathway-grid">
+            <article class="pathway-card">
+              <span>01</span>
+              <h3>写目标并设时长</h3>
+              <p>说明这轮真正要完成什么，再设定这次准备专注多久。</p>
+            </article>
+            <article class="pathway-card">
+              <span>02</span>
+              <h3>共享真实工作窗口</h3>
+              <p>选择你实际要工作的屏幕、窗口或标签页，让系统能定时记录这段过程。</p>
+            </article>
+            <article class="pathway-card">
+              <span>03</span>
+              <h3>结束后直接看报告</h3>
+              <p>因为采集过程中已经持续评分，所以专注时长结束后会直接给出完整报告。</p>
+            </article>
+          </div>
+        </section>
+      {% endif %}
+    </main>
+  </div>
+
+  <script>
+    window.focusRuntime = {{ runtime|tojson }};
+  </script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
+
+
