@@ -56,12 +56,41 @@ def _jpeg_data_url_and_digest(image: np.ndarray) -> tuple[str, str]:
 
 
 def _extract_json_payload(content: str) -> str:
+    """
+    从一段可能“夹带额外文本/代码块”的输出中提取第一个完整的 JSON 对象。
+    使用简易的括号计数，并正确处理字符串内的花括号/引号转义。
+    """
     stripped = content.strip()
     start = stripped.find("{")
-    end = stripped.rfind("}")
-    if start == -1 or end == -1 or end < start:
-        raise RuntimeError("模型返回内容不是有效 JSON。")
-    return stripped[start : end + 1]
+    if start == -1:
+        raise RuntimeError("模型返回内容中未找到 '{'，无法提取 JSON。")
+
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(stripped)):
+        ch = stripped[i]
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == "\"":
+                in_string = False
+            continue
+
+        if ch == "\"":
+            in_string = True
+            continue
+        if ch == "{":
+            depth += 1
+            continue
+        if ch == "}":
+            depth -= 1
+            if depth == 0:
+                return stripped[start : i + 1]
+
+    raise RuntimeError("模型返回 JSON 对象未闭合，可能是输出被截断。")
 
 
 class SiliconFlowVlmScorer:
@@ -201,6 +230,12 @@ class SiliconFlowVlmScorer:
         try:
             return self._post_chat_completion(endpoint, payload)
         except RuntimeError as exc:
+            # 若模型输出被截断导致 JSON 解析失败，尝试提高 max_tokens 重试一次
+            msg = str(exc)
+            if ("JSON" in msg or "解析" in msg or "未闭合" in msg) and self.config.siliconflow_max_tokens < 3000:
+                payload_retry = dict(payload)
+                payload_retry["max_tokens"] = min(int(payload_retry.get("max_tokens", self.config.siliconflow_max_tokens) * 1.5), 3000)
+                return self._post_chat_completion(endpoint, payload_retry)
             if use_json_object and "HTTP 400" in str(exc):
                 payload.pop("response_format", None)
                 return self._post_chat_completion(endpoint, payload)
@@ -227,12 +262,28 @@ class SiliconFlowVlmScorer:
         except error.URLError as exc:
             raise RuntimeError(f"网络请求失败：{exc.reason}") from exc
 
-        body = json.loads(raw_response)
+        try:
+            body = json.loads(raw_response)
+        except json.JSONDecodeError as exc:
+            snippet = raw_response[:400].replace("\n", "\\n")
+            raise RuntimeError(f"SiliconFlow 返回了非 JSON 响应：{exc}. raw_snippet={snippet}") from exc
         message = ((body.get("choices") or [{}])[0].get("message") or {})
         content = str(message.get("content") or "").strip()
         if not content:
             raise RuntimeError("模型返回了空内容。")
-        return json.loads(_extract_json_payload(content))
+
+        # 优先把 content 当作“纯 JSON”直接解析；失败再做花括号提取与二次解析
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError:
+            extracted = _extract_json_payload(content)
+            try:
+                return json.loads(extracted)
+            except json.JSONDecodeError as exc:
+                snippet = content[:400].replace("\n", "\\n")
+                raise RuntimeError(
+                    f"模型返回内容JSON解析失败：{exc}. content_snippet={snippet}"
+                ) from exc
 
     def _build_endpoint(self) -> str:
         base_url = self.config.siliconflow_base_url.rstrip("/")
