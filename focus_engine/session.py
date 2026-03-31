@@ -20,10 +20,11 @@ class SessionState:
     created_at: float
     updated_at: float
     duration_seconds: int
+    monitoring_mode: str = "medium"
     status: str = "running"
     completed_at: float | None = None
     frames: list[FrameAnalysis] = field(default_factory=list)
-
+    ai_advice: str = ""
 
 class StreamingSessionManager:
     def __init__(self, analyzer: FocusAnalyzer, config: AnalyzerConfig = DEFAULT_CONFIG) -> None:
@@ -81,21 +82,37 @@ class StreamingSessionManager:
 
     def _build_payload(self, state: SessionState) -> dict:
         items = list(state.frames)
+        should_alert = False
+        if items:
+            last_item = items[-1]
+            if state.monitoring_mode == "high":
+                # 高监控：只要最新的一帧是“分心”就提醒
+                if last_item.status == "分心":
+                    should_alert = True
+            elif state.monitoring_mode == "medium":
+                # 中监控：检查最近 5 帧，如果分心超过 2 帧则提醒
+                recent_frames = items[-5:]
+                distract_count = sum(1 for f in recent_frames if f.status == "分心")
+                if distract_count >= 2:
+                    should_alert = True
         processing_ms = sum(max(item.processing_ms, 0) for item in items)
         summary = build_summary(state.profile, items, processing_ms=processing_ms)
         state.updated_at = time.time()
         return {
             "session": self._session_meta(state),
+            "should_alert": should_alert,
             "goal": state.goal,
             "goal_profile": state.profile.to_dict(),
             "summary": summary,
             "items": [item.to_dict() for item in items],
+            "ai_advice": getattr(state, 'ai_advice', ''),
         }
 
     def start(
         self,
         goal: str,
         duration_minutes: int | None = None,
+        monitoring_mode: str = "medium",
         capture_interval_seconds: int | None = None,
     ) -> dict:
         self._prune()
@@ -110,6 +127,7 @@ class StreamingSessionManager:
             created_at=now,
             updated_at=now,
             duration_seconds=duration_seconds,
+            monitoring_mode=monitoring_mode,
         )
         self.sessions[session_id] = state
         return self._build_payload(state)
@@ -152,5 +170,12 @@ class StreamingSessionManager:
         if state.status != "completed":
             state.status = "completed"
             state.completed_at = time.time()
-            state.updated_at = state.completed_at
+            
+            if not state.ai_advice:
+                # 先构建一个临时的 payload 来获取 summary 统计数据
+                temp_payload = self._build_payload(state)
+                summary_stats = temp_payload.get("summary", {})
+                # 调用 VLM 引擎
+                state.ai_advice = self.analyzer.vlm.generate_session_summary(state.goal, summary_stats)
+
         return self._build_payload(state)

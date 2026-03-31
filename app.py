@@ -145,14 +145,20 @@ def start_session():
     goal = extract_goal_from_request()
     if not goal:
         return jsonify({"error": "missing_goal"}), 400
-
+    payload_data = request.get_json(silent=True) or {}
+    monitoring_mode = payload_data.get("monitoring_mode", "medium")
     try:
         duration_minutes = extract_int_from_request("duration_minutes")
     except ValueError as exc:
         return jsonify({"error": f"invalid_{exc.args[0]}"}), 400
 
     try:
-        payload = session_manager.start(goal, duration_minutes=duration_minutes)
+        # 【修改调用方式】传入 monitoring_mode
+        payload = session_manager.start(
+            goal, 
+            duration_minutes=duration_minutes, 
+            monitoring_mode=monitoring_mode
+        )
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     return jsonify(payload)

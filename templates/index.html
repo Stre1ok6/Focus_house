@@ -1,11 +1,13 @@
 ﻿<!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>专注小屋 | 实时专注记录</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
+
 <body>
   <div class="page-shell">
     <header class="hero">
@@ -29,9 +31,9 @@
         </div>
         <p class="status-note">
           {% if runtime['ocr_ready'] %}
-            推荐共享你当前真正工作的窗口，而不是这个网页本身，这样报告会更贴近真实专注过程。
+          推荐共享你当前真正工作的窗口，而不是这个网页本身，这样报告会更贴近真实专注过程。
           {% else %}
-            当前识别服务还没准备好，建议先完成配置，再开始实时记录。
+          当前识别服务还没准备好，建议先完成配置，再开始实时记录。
           {% endif %}
         </p>
 
@@ -94,7 +96,8 @@
           <div class="panel-pulse">
             <span>当前计划</span>
             <strong>{{ runtime["session_default_duration_minutes"] }} 分钟默认时长</strong>
-            <small>单次最短 {{ runtime["session_min_duration_minutes"] }} 分钟，最长 {{ runtime["session_max_duration_minutes"] }} 分钟</small>
+            <small>单次最短 {{ runtime["session_min_duration_minutes"] }} 分钟，最长 {{ runtime["session_max_duration_minutes"]
+              }} 分钟</small>
           </div>
         </div>
 
@@ -104,39 +107,54 @@
           <div class="form-main">
             <label>
               <span>这次想专注完成什么</span>
-              <textarea id="liveGoal" rows="4" placeholder="{{ runtime['goal_placeholder'] }}">{{ selected_goal }}</textarea>
+              <textarea id="liveGoal" rows="4"
+                placeholder="{{ runtime['goal_placeholder'] }}">{{ selected_goal }}</textarea>
             </label>
 
             <p class="field-note">建议写成这次真正要完成的任务，例如“整理旅行预算并筛选酒店”，这样实时评分会更贴近你的实际状态。</p>
+
+            <div class="quick-goals-container">
+              <span class="quick-goal-tag">📖 阅读论文</span>
+              <span class="quick-goal-tag">💻 编写代码</span>
+              <span class="quick-goal-tag">📖 日常学习</span>
+              <span class="quick-goal-tag">🔌 调试项目</span>
+            </div>
 
             <div class="goal-help-caption">本轮专注设置</div>
             <div class="inline-form live-settings-row">
               <label class="duration-field">
                 <span>专注时长（分钟）</span>
-                <input id="liveDuration" type="number" min="{{ runtime['session_min_duration_minutes'] }}" max="{{ runtime['session_max_duration_minutes'] }}" step="1" value="{{ runtime['session_default_duration_minutes'] }}">
+                <input id="liveDuration" type="number" min="{{ runtime['session_min_duration_minutes'] }}"
+                  max="{{ runtime['session_max_duration_minutes'] }}" step="1"
+                  value="{{ runtime['session_default_duration_minutes'] }}">
               </label>
+
+              <label class="duration-field">
+                <span>监控等级</span>
+                <select id="liveMonitoringMode">
+                  <option value="high">高监控 (单次分心即提醒)</option>
+                  <option value="medium" selected>中监控 (时段超限提醒)</option>
+                  <option value="low">低监控 (仅生成报告)</option>
+                </select>
+              </label>
+
               <article class="capture-kpi">
                 <span>采集模式</span>
                 <strong id="expectedFrames">连续采集</strong>
-                <p>不再预设固定间隔，而是在时长内持续衔接截图和分析</p>
-              </article>
-              <article class="capture-kpi soft">
-                <span>推进方式</span>
-                <strong>分析后立刻继续</strong>
-                <p>上一张截图处理完成后，会马上继续抓取下一张</p>
+                <p>分析后立刻继续</p>
               </article>
             </div>
 
             <div class="goal-help-caption">目标写法参考</div>
             <div class="goal-help-grid">
               {% for example in runtime["goal_examples"] %}
-                <article class="goal-help-card">
-                  <div class="goal-help-head">
-                    <strong>写法 {{ loop.index }}</strong>
-                    <span>参考</span>
-                  </div>
-                  <p>{{ example }}</p>
-                </article>
+              <article class="goal-help-card">
+                <div class="goal-help-head">
+                  <strong>写法 {{ loop.index }}</strong>
+                  <span>参考</span>
+                </div>
+                <p>{{ example }}</p>
+              </article>
               {% endfor %}
             </div>
 
@@ -171,9 +189,9 @@
               <h3>{{ '现在可以开始共享屏幕' if runtime['ocr_ready'] else '开始前先检查识别服务' }}</h3>
               <p>
                 {% if runtime['ocr_ready'] %}
-                  如果你准备好了，就直接点击开始。系统会在记录过程中持续更新总览，不需要你手动刷新页面。
+                如果你准备好了，就直接点击开始。系统会在记录过程中持续更新总览，不需要你手动刷新页面。
                 {% else %}
-                  当前识别服务还没准备好，建议先完善环境配置，再开始实时记录，以免只采到图片却无法及时输出评分。
+                当前识别服务还没准备好，建议先完善环境配置，再开始实时记录，以免只采到图片却无法及时输出评分。
                 {% endif %}
               </p>
             </article>
@@ -243,7 +261,14 @@
           </div>
           <div id="liveReportTags" class="tag-list"></div>
         </div>
-
+        <article id="aiAdviceCard" class="summary-card ai-advice-card hiden"
+          style="grid-column: 1 / -1; margin-bottom: 16px;">
+          <div class="ai-header">
+            <span class="ai-icon">✨</span>
+            <span class="ai-title">AI复盘寄语</span>
+          </div>
+          <p id="liveAiAdvice" class="ai-content">正在为您整理本次专注的复盘...</p>
+        </article>
         <div id="liveSummaryGrid" class="summary-grid"></div>
 
         <div class="report-duo">
@@ -293,7 +318,7 @@
         </div>
 
         {% if error %}
-          <div class="message error">{{ error }}</div>
+        <div class="message error">{{ error }}</div>
         {% endif %}
 
         <form action="{{ url_for('analyze') }}" method="post" enctype="multipart/form-data" class="focus-form">
@@ -301,7 +326,8 @@
             <div class="form-main">
               <label>
                 <span>这次想回顾什么任务</span>
-                <textarea name="goal" rows="4" required placeholder="{{ runtime['goal_placeholder'] }}">{{ selected_goal }}</textarea>
+                <textarea name="goal" rows="4" required
+                  placeholder="{{ runtime['goal_placeholder'] }}">{{ selected_goal }}</textarea>
               </label>
 
               <p class="field-note">如果你已经错过了实时记录，依然可以把一段历史截图按顺序补传进来。</p>
@@ -309,7 +335,8 @@
               <div class="goal-help-caption">上传历史截图</div>
               <label>
                 <span>选择截图文件</span>
-                <input type="file" name="screenshots" accept="{{ runtime['supported_extensions']|replace(', ', ',') }}" multiple required>
+                <input type="file" name="screenshots" accept="{{ runtime['supported_extensions']|replace(', ', ',') }}"
+                  multiple required>
               </label>
 
               <div class="input-hint">
@@ -343,181 +370,182 @@
       </section>
 
       {% if report %}
-        <section id="report" class="panel report-panel">
-          <div class="panel-head">
-            <div>
-              <span class="section-label">补传结果</span>
-              <h2>这组历史截图，已经帮你整理好了</h2>
-              <p>{{ generated_at.strftime('%Y-%m-%d %H:%M:%S') }} 生成，本次目标是“{{ report["summary"]["goal_label"] }}”。</p>
+      <section id="report" class="panel report-panel">
+        <div class="panel-head">
+          <div>
+            <span class="section-label">补传结果</span>
+            <h2>这组历史截图，已经帮你整理好了</h2>
+            <p>{{ generated_at.strftime('%Y-%m-%d %H:%M:%S') }} 生成，本次目标是“{{ report["summary"]["goal_label"] }}”。</p>
+          </div>
+          <div class="tag-list">
+            <span class="tag">已分析 {{ report["summary"]["valid_images"] }} 张</span>
+            <span class="tag">专注占比 {{ report["summary"]["focus_ratio"] }}%</span>
+          </div>
+        </div>
+
+        <div class="summary-grid">
+          <article class="summary-card score-card">
+            <span>平均专注状态</span>
+            <strong>{{ report["summary"]["avg_focus_score"] }}</strong>
+            <p>分数越高，说明这一段记录越稳定地围绕当前目标展开。</p>
+            <div class="meter"><span style="width: {{ report['summary']['avg_focus_score'] }}%"></span></div>
+          </article>
+          <article class="summary-card">
+            <span>保持专注的时间</span>
+            <strong>{{ report["summary"]["focus_ratio"] }}%</strong>
+            <p>专注 {{ report["summary"]["focus_count"] }} 张，轻微偏离 {{ report["summary"]["drift_count"] }} 张，分心 {{
+              report["summary"]["distract_count"] }} 张。</p>
+          </article>
+          <article class="summary-card value-card">
+            <span>最常见的投入场景</span>
+            <strong>{{ report["summary"]["top_context"] }}</strong>
+            <p>这通常代表你更容易进入状态的内容类型或页面氛围。</p>
+          </article>
+          <article class="summary-card value-card">
+            <span>最需要注意的偏离场景</span>
+            <strong>{{ report["summary"]["top_distractor"] }}</strong>
+            <p>先把这类偏离场景梳理清楚，整体表现通常会更稳定。</p>
+          </article>
+          <article class="summary-card">
+            <span>和目标的贴合度</span>
+            <strong>{{ report["summary"]["avg_relevance_score"] }}</strong>
+            <p>贴合度越高，说明截图内容越接近你一开始写下的任务。</p>
+          </article>
+          <article class="summary-card">
+            <span>画面识别清晰度</span>
+            <strong>{{ report["summary"]["avg_ocr_quality"] }}</strong>
+            <p>截图越清晰，报告越适合拿来复盘细节和定位问题。</p>
+          </article>
+        </div>
+
+        <div class="report-duo">
+          <article class="insight-card narrative-card">
+            <div class="card-header">
+              <h3>这组记录里，系统更常捕捉到这些任务信号</h3>
+              <span class="mini-pill">任务线索</span>
             </div>
+            <p>这些关键词最能代表你这次任务的核心内容，也是在报告里反复出现的专注线索。</p>
             <div class="tag-list">
-              <span class="tag">已分析 {{ report["summary"]["valid_images"] }} 张</span>
-              <span class="tag">专注占比 {{ report["summary"]["focus_ratio"] }}%</span>
+              {% for keyword in report["summary"]["keywords"] %}
+              <span class="tag">{{ keyword }}</span>
+              {% endfor %}
             </div>
-          </div>
-
-          <div class="summary-grid">
-            <article class="summary-card score-card">
-              <span>平均专注状态</span>
-              <strong>{{ report["summary"]["avg_focus_score"] }}</strong>
-              <p>分数越高，说明这一段记录越稳定地围绕当前目标展开。</p>
-              <div class="meter"><span style="width: {{ report['summary']['avg_focus_score'] }}%"></span></div>
-            </article>
-            <article class="summary-card">
-              <span>保持专注的时间</span>
-              <strong>{{ report["summary"]["focus_ratio"] }}%</strong>
-              <p>专注 {{ report["summary"]["focus_count"] }} 张，轻微偏离 {{ report["summary"]["drift_count"] }} 张，分心 {{ report["summary"]["distract_count"] }} 张。</p>
-            </article>
-            <article class="summary-card value-card">
-              <span>最常见的投入场景</span>
-              <strong>{{ report["summary"]["top_context"] }}</strong>
-              <p>这通常代表你更容易进入状态的内容类型或页面氛围。</p>
-            </article>
-            <article class="summary-card value-card">
-              <span>最需要注意的偏离场景</span>
-              <strong>{{ report["summary"]["top_distractor"] }}</strong>
-              <p>先把这类偏离场景梳理清楚，整体表现通常会更稳定。</p>
-            </article>
-            <article class="summary-card">
-              <span>和目标的贴合度</span>
-              <strong>{{ report["summary"]["avg_relevance_score"] }}</strong>
-              <p>贴合度越高，说明截图内容越接近你一开始写下的任务。</p>
-            </article>
-            <article class="summary-card">
-              <span>画面识别清晰度</span>
-              <strong>{{ report["summary"]["avg_ocr_quality"] }}</strong>
-              <p>截图越清晰，报告越适合拿来复盘细节和定位问题。</p>
-            </article>
-          </div>
-
-          <div class="report-duo">
-            <article class="insight-card narrative-card">
-              <div class="card-header">
-                <h3>这组记录里，系统更常捕捉到这些任务信号</h3>
-                <span class="mini-pill">任务线索</span>
-              </div>
-              <p>这些关键词最能代表你这次任务的核心内容，也是在报告里反复出现的专注线索。</p>
-              <div class="tag-list">
-                {% for keyword in report["summary"]["keywords"] %}
-                  <span class="tag">{{ keyword }}</span>
-                {% endfor %}
-              </div>
-              <div class="mini-metrics">
-                <div><span>目标贴合</span><strong>{{ report["summary"]["avg_relevance_score"] }}</strong></div>
-                <div><span>画面清晰</span><strong>{{ report["summary"]["avg_ocr_quality"] }}</strong></div>
-                <div><span>重点命中</span><strong>{{ report["summary"]["avg_strong_hit_score"] }}</strong></div>
-                <div><span>页面结构</span><strong>{{ report["summary"]["avg_structure_score"] }}</strong></div>
-              </div>
-            </article>
-
-            <article class="insight-card suggestion-card">
-              <div class="card-header">
-                <h3>下一次开始前，可以先做这几件事</h3>
-                <span class="mini-pill">行动建议</span>
-              </div>
-              <ul class="suggestion-list">
-                {% for suggestion in report["summary"]["suggestions"] %}
-                  <li>{{ suggestion }}</li>
-                {% endfor %}
-              </ul>
-            </article>
-          </div>
-        </section>
-
-        <section class="panel detail-panel">
-          <div class="panel-head">
-            <div>
-              <span class="section-label">逐张回顾</span>
-              <h2>如果你想看得更细，这里可以逐张回放</h2>
-              <p>每张截图都会展示状态判断和原因，方便你定位是哪一刻开始偏离、又是因为什么偏离。</p>
+            <div class="mini-metrics">
+              <div><span>目标贴合</span><strong>{{ report["summary"]["avg_relevance_score"] }}</strong></div>
+              <div><span>画面清晰</span><strong>{{ report["summary"]["avg_ocr_quality"] }}</strong></div>
+              <div><span>重点命中</span><strong>{{ report["summary"]["avg_strong_hit_score"] }}</strong></div>
+              <div><span>页面结构</span><strong>{{ report["summary"]["avg_structure_score"] }}</strong></div>
             </div>
-          </div>
+          </article>
 
-          <div class="detail-list">
-            {% for item in report["items"] %}
-              <article class="detail-card">
-                <div class="detail-top">
-                  <div>
-                    <h3>{{ item["filename"] }}</h3>
-                    <p>{{ item["category_label"] }} · {{ item["status"] }}</p>
-                  </div>
-                  <div class="score-badge {{ 'focus' if item['status'] == '专注' else 'warn' if item['status'] == '轻微偏离' else 'danger' }}">
-                    {{ item["focus_score"] }}
-                  </div>
-                </div>
-                <div class="detail-metrics">
-                  <span>贴合度 {{ item["relevance_score"] }}</span>
-                  <span>清晰度 {{ item["ocr_quality_score"] }}</span>
-                  <span>重点命中 {{ item["strong_hit_score"] }}</span>
-                  <span>关键词 {{ item["keyword_hit_score"] }}</span>
-                  <span>结构信号 {{ item["structure_score"] }}</span>
-                  <span>连续稳定 {{ item["window_consistency_score"] }}</span>
-                </div>
-                {% if item["cache_hit"] or item["used_fallback"] %}
-                  <div class="detail-flags">
-                    {% if item["cache_hit"] %}
-                      <span class="tag">结果复用</span>
-                    {% endif %}
-                    {% if item["used_fallback"] %}
-                      <span class="tag">备用识别</span>
-                    {% endif %}
-                  </div>
-                {% endif %}
-                <p class="detail-reason">{{ item["decision_reason"] }}</p>
-                {% if item["fallback_reason"] %}
-                  <p class="detail-reason subtle">{{ item["fallback_reason"] }}</p>
-                {% endif %}
-                {% if item["matched_keywords"] %}
-                  <div class="tag-list compact">
-                    {% for keyword in item["matched_keywords"] %}
-                      <span class="tag">{{ keyword }}</span>
-                    {% endfor %}
-                  </div>
-                {% endif %}
-                <details>
-                  <summary>查看识别文本</summary>
-                  <pre>{{ item["ocr_text"] if item["ocr_text"] else '当前图片没有提取到足够清晰的文本内容。' }}</pre>
-                </details>
-              </article>
-            {% endfor %}
+          <article class="insight-card suggestion-card">
+            <div class="card-header">
+              <h3>下一次开始前，可以先做这几件事</h3>
+              <span class="mini-pill">行动建议</span>
+            </div>
+            <ul class="suggestion-list">
+              {% for suggestion in report["summary"]["suggestions"] %}
+              <li>{{ suggestion }}</li>
+              {% endfor %}
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel detail-panel">
+        <div class="panel-head">
+          <div>
+            <span class="section-label">逐张回顾</span>
+            <h2>如果你想看得更细，这里可以逐张回放</h2>
+            <p>每张截图都会展示状态判断和原因，方便你定位是哪一刻开始偏离、又是因为什么偏离。</p>
           </div>
-        </section>
+        </div>
+
+        <div class="detail-list">
+          {% for item in report["items"] %}
+          <article class="detail-card">
+            <div class="detail-top">
+              <div>
+                <h3>{{ item["filename"] }}</h3>
+                <p>{{ item["category_label"] }} · {{ item["status"] }}</p>
+              </div>
+              <div
+                class="score-badge {{ 'focus' if item['status'] == '专注' else 'warn' if item['status'] == '轻微偏离' else 'danger' }}">
+                {{ item["focus_score"] }}
+              </div>
+            </div>
+            <div class="detail-metrics">
+              <span>贴合度 {{ item["relevance_score"] }}</span>
+              <span>清晰度 {{ item["ocr_quality_score"] }}</span>
+              <span>重点命中 {{ item["strong_hit_score"] }}</span>
+              <span>关键词 {{ item["keyword_hit_score"] }}</span>
+              <span>结构信号 {{ item["structure_score"] }}</span>
+              <span>连续稳定 {{ item["window_consistency_score"] }}</span>
+            </div>
+            {% if item["cache_hit"] or item["used_fallback"] %}
+            <div class="detail-flags">
+              {% if item["cache_hit"] %}
+              <span class="tag">结果复用</span>
+              {% endif %}
+              {% if item["used_fallback"] %}
+              <span class="tag">备用识别</span>
+              {% endif %}
+            </div>
+            {% endif %}
+            <p class="detail-reason">{{ item["decision_reason"] }}</p>
+            {% if item["fallback_reason"] %}
+            <p class="detail-reason subtle">{{ item["fallback_reason"] }}</p>
+            {% endif %}
+            {% if item["matched_keywords"] %}
+            <div class="tag-list compact">
+              {% for keyword in item["matched_keywords"] %}
+              <span class="tag">{{ keyword }}</span>
+              {% endfor %}
+            </div>
+            {% endif %}
+            <details>
+              <summary>查看识别文本</summary>
+              <pre>{{ item["ocr_text"] if item["ocr_text"] else '当前图片没有提取到足够清晰的文本内容。' }}</pre>
+            </details>
+          </article>
+          {% endfor %}
+        </div>
+      </section>
       {% else %}
-        <section class="panel pathway-panel">
-          <div class="panel-head">
-            <div>
-              <span class="section-label">实时模式三步</span>
-              <h2>现在的主流程已经是实时截图加报告输出</h2>
-              <p>如果你准备开始一段新的专注过程，直接使用上面的实时模式就可以，不需要先手动准备截图。</p>
-            </div>
+      <section class="panel pathway-panel">
+        <div class="panel-head">
+          <div>
+            <span class="section-label">实时模式三步</span>
+            <h2>现在的主流程已经是实时截图加报告输出</h2>
+            <p>如果你准备开始一段新的专注过程，直接使用上面的实时模式就可以，不需要先手动准备截图。</p>
           </div>
-          <div class="pathway-grid">
-            <article class="pathway-card">
-              <span>01</span>
-              <h3>写目标并设时长</h3>
-              <p>说明这轮真正要完成什么，再设定这次准备专注多久。</p>
-            </article>
-            <article class="pathway-card">
-              <span>02</span>
-              <h3>共享真实工作窗口</h3>
-              <p>选择你实际要工作的屏幕、窗口或标签页，让系统能定时记录这段过程。</p>
-            </article>
-            <article class="pathway-card">
-              <span>03</span>
-              <h3>结束后直接看报告</h3>
-              <p>因为采集过程中已经持续评分，所以专注时长结束后会直接给出完整报告。</p>
-            </article>
-          </div>
-        </section>
+        </div>
+        <div class="pathway-grid">
+          <article class="pathway-card">
+            <span>01</span>
+            <h3>写目标并设时长</h3>
+            <p>说明这轮真正要完成什么，再设定这次准备专注多久。</p>
+          </article>
+          <article class="pathway-card">
+            <span>02</span>
+            <h3>共享真实工作窗口</h3>
+            <p>选择你实际要工作的屏幕、窗口或标签页，让系统能定时记录这段过程。</p>
+          </article>
+          <article class="pathway-card">
+            <span>03</span>
+            <h3>结束后直接看报告</h3>
+            <p>因为采集过程中已经持续评分，所以专注时长结束后会直接给出完整报告。</p>
+          </article>
+        </div>
+      </section>
       {% endif %}
     </main>
   </div>
 
   <script>
-    window.focusRuntime = {{ runtime|tojson }};
+    window.focusRuntime = {{ runtime | tojson }};
   </script>
   <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
+
 </html>
-
-

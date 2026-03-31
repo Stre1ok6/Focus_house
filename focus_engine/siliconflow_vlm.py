@@ -493,3 +493,49 @@ class SiliconFlowVlmScorer:
             if len(items) >= limit:
                 break
         return items
+
+    def generate_session_summary(self, goal: str, summary_stats: dict) -> str:
+        # 1. 修正这里：从 self.config 中读取 api_key
+        if not self.config.siliconflow_api_key:
+            return "AI 导师未配置 API Key，无法生成总结。"
+
+        prompt = f"""你是一个贴心且专业的 AI 专注力导师。用户刚刚完成了一段专注时刻。
+用户的目标是："{goal}"
+
+以下是这段时间的数据统计：
+- 专注占比：{summary_stats.get('focus_ratio', 0)}%
+- 平均专注得分：{summary_stats.get('avg_focus_score', 0)}/100
+- 最佳投入场景：{summary_stats.get('top_context', '无')}
+- 最大分心干扰：{summary_stats.get('top_distractor', '无')}
+- 偏离次数：分心 {summary_stats.get('distract_count', 0)} 次，轻微偏离 {summary_stats.get('drift_count', 0)} 次
+
+请你用第一人称（“我”是导师，“你”是用户），写一段 100 字以内的复盘寄语。
+语气要温和、鼓励。如果专注度高，请给予表扬；如果分心较多，请针对“最大分心干扰”给出一点实用的改善建议。
+注意：直接输出一段纯文本，不要使用 Markdown 格式，不要罗列数据，要像人说话一样自然。"""
+
+        payload = {
+            # 2. 修正这里：从 self.config 中读取 model
+            "model": self.config.siliconflow_model,
+            "messages": [
+                {"role": "system", "content": "你是一个专业的专注力辅导 AI。"},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.6,
+            "max_tokens": 200,
+        }
+        
+        headers = {
+            # 3. 修正这里：使用 self.config.siliconflow_api_key
+            "Authorization": f"Bearer {self.config.siliconflow_api_key}",
+            "Content-Type": "application/json"
+        }
+
+        try:
+            # 4. 修正这里：使用 self.config.siliconflow_base_url
+            req = request.Request(f"{self.config.siliconflow_base_url}/chat/completions", data=json.dumps(payload).encode("utf-8"), headers=headers)
+            with request.urlopen(req, timeout=30) as response:
+                result = json.loads(response.read().decode("utf-8"))
+                return result["choices"][0]["message"]["content"].strip()
+        except Exception as e:
+            print(f"【Debug】AI请求失败: {e}") # 顺便加个打印方便排查网络问题
+            return "AI 总结生成失败，请稍后再试或检查网络。"
