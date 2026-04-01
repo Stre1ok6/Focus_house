@@ -495,7 +495,6 @@ class SiliconFlowVlmScorer:
         return items
 
     def generate_session_summary(self, goal: str, summary_stats: dict) -> str:
-        # 1. 修正这里：从 self.config 中读取 api_key
         if not self.config.siliconflow_api_key:
             return "AI 导师未配置 API Key，无法生成总结。"
 
@@ -507,35 +506,49 @@ class SiliconFlowVlmScorer:
 - 平均专注得分：{summary_stats.get('avg_focus_score', 0)}/100
 - 最佳投入场景：{summary_stats.get('top_context', '无')}
 - 最大分心干扰：{summary_stats.get('top_distractor', '无')}
-- 偏离次数：分心 {summary_stats.get('distract_count', 0)} 次，轻微偏离 {summary_stats.get('drift_count', 0)} 次
 
-请你用第一人称（“我”是导师，“你”是用户），写一段 100 字以内的复盘寄语。
-语气要温和、鼓励。如果专注度高，请给予表扬；如果分心较多，请针对“最大分心干扰”给出一点实用的改善建议。
-注意：直接输出一段纯文本，不要使用 Markdown 格式，不要罗列数据，要像人说话一样自然。"""
+请你用第一人称写一段简短的复盘寄语。
+语气要温和、鼓励。严禁输出任何思考过程、草稿或多余的解释，直接开口对我说最终的寄语！"""
 
         payload = {
-            # 2. 修正这里：从 self.config 中读取 model
             "model": self.config.siliconflow_model,
             "messages": [
-                {"role": "system", "content": "你是一个专业的专注力辅导 AI。"},
+                {"role": "system", "content": "你是一个辅导AI。必须直接输出最终结果，禁止附带任何分析或思考过程。"},
                 {"role": "user", "content": prompt}
             ],
             "temperature": 0.6,
-            "max_tokens": 200,
+            "max_tokens": 4096, 
         }
         
         headers = {
-            # 3. 修正这里：使用 self.config.siliconflow_api_key
             "Authorization": f"Bearer {self.config.siliconflow_api_key}",
             "Content-Type": "application/json"
         }
 
         try:
-            # 4. 修正这里：使用 self.config.siliconflow_base_url
             req = request.Request(f"{self.config.siliconflow_base_url}/chat/completions", data=json.dumps(payload).encode("utf-8"), headers=headers)
-            with request.urlopen(req, timeout=30) as response:
-                result = json.loads(response.read().decode("utf-8"))
-                return result["choices"][0]["message"]["content"].strip()
+            with request.urlopen(req, timeout=60) as response:
+                raw_data = response.read().decode("utf-8")
+                
+                # 留着探头，方便以后观察
+                print(f"【Deep Debug】大模型原始返回包：{raw_data}") 
+                
+                result = json.loads(raw_data)
+                message = result.get("choices", [{}])[0].get("message", {})
+                
+                # 🚨 核心修改：只拿正式的 content，绝不去碰 reasoning_content！
+                content = message.get("content") or ""
+                
+                # 清除可能带有的 <think> 标签（以防它写在正文里）
+                import re
+                final_text = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+                
+                # 如果它因为字数超限等原因，导致正式正文没写出来，直接触发保底
+                if not final_text:
+                    return "系统检测到你刚才表现不错，继续保持这份专注！"
+                    
+                return final_text
+                
         except Exception as e:
-            print(f"【Debug】AI请求失败: {e}") # 顺便加个打印方便排查网络问题
+            print(f"【Debug】AI请求失败: {e}") 
             return "AI 总结生成失败，请稍后再试或检查网络。"

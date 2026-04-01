@@ -167,15 +167,17 @@ class StreamingSessionManager:
             raise KeyError("session_not_found")
 
         state = self.sessions[session_id]
+        
         if state.status != "completed":
             state.status = "completed"
             state.completed_at = time.time()
             
-            if not state.ai_advice:
-                # 先构建一个临时的 payload 来获取 summary 统计数据
-                temp_payload = self._build_payload(state)
-                summary_stats = temp_payload.get("summary", {})
-                # 调用 VLM 引擎
-                state.ai_advice = self.analyzer.vlm.generate_session_summary(state.goal, summary_stats)
+        if not state.ai_advice:
+            print("【Debug】开始请求 AI 总结...")
+            temp_payload = self._build_payload(state)
+            summary_stats = temp_payload.get("summary", {})
+            # 调用 VLM 引擎
+            state.ai_advice = self.analyzer.vlm.generate_session_summary(state.goal, summary_stats)
+            print(f"【Debug】AI 寄语生成完毕：{state.ai_advice}")
 
         return self._build_payload(state)
