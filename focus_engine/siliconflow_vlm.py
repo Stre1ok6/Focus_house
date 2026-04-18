@@ -493,3 +493,62 @@ class SiliconFlowVlmScorer:
             if len(items) >= limit:
                 break
         return items
+
+    def generate_session_summary(self, goal: str, summary_stats: dict) -> str:
+        if not self.config.siliconflow_api_key:
+            return "AI 导师未配置 API Key，无法生成总结。"
+
+        prompt = f"""你是一个贴心且专业的 AI 专注力导师。用户刚刚完成了一段专注时刻。
+用户的目标是："{goal}"
+
+以下是这段时间的数据统计：
+- 专注占比：{summary_stats.get('focus_ratio', 0)}%
+- 平均专注得分：{summary_stats.get('avg_focus_score', 0)}/100
+- 最佳投入场景：{summary_stats.get('top_context', '无')}
+- 最大分心干扰：{summary_stats.get('top_distractor', '无')}
+
+请你用第一人称写一段简短的复盘寄语。
+语气要温和、鼓励。严禁输出任何思考过程、草稿或多余的解释，直接开口对我说最终的寄语！"""
+
+        payload = {
+            "model": self.config.siliconflow_model,
+            "messages": [
+                {"role": "system", "content": "你是一个辅导AI。必须直接输出最终结果，禁止附带任何分析或思考过程。"},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.6,
+            "max_tokens": 4096, 
+        }
+        
+        headers = {
+            "Authorization": f"Bearer {self.config.siliconflow_api_key}",
+            "Content-Type": "application/json"
+        }
+
+        try:
+            req = request.Request(f"{self.config.siliconflow_base_url}/chat/completions", data=json.dumps(payload).encode("utf-8"), headers=headers)
+            with request.urlopen(req, timeout=60) as response:
+                raw_data = response.read().decode("utf-8")
+                
+                # 留着探头，方便以后观察
+                print(f"【Deep Debug】大模型原始返回包：{raw_data}") 
+                
+                result = json.loads(raw_data)
+                message = result.get("choices", [{}])[0].get("message", {})
+                
+                # 🚨 核心修改：只拿正式的 content，绝不去碰 reasoning_content！
+                content = message.get("content") or ""
+                
+                # 清除可能带有的 <think> 标签（以防它写在正文里）
+                import re
+                final_text = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+                
+                # 如果它因为字数超限等原因，导致正式正文没写出来，直接触发保底
+                if not final_text:
+                    return "系统检测到你刚才表现不错，继续保持这份专注！"
+                    
+                return final_text
+                
+        except Exception as e:
+            print(f"【Debug】AI请求失败: {e}") 
+            return "AI 总结生成失败，请稍后再试或检查网络。"

@@ -35,6 +35,8 @@
     liveKeywords: document.getElementById("liveKeywords"),
     liveMetricsGrid: document.getElementById("liveMetricsGrid"),
     liveSuggestions: document.getElementById("liveSuggestions"),
+    liveAiAdvice: document.getElementById("liveAiAdvice"),
+    aiAdviceCard: document.getElementById("aiAdviceCard"),
     liveDetailList: document.getElementById("liveDetailList"),
   };
 
@@ -160,6 +162,8 @@
   function resetReportSections() {
     state.renderedDetailCount = 0;
     elements.liveReport.classList.add("hidden");
+    elements.aiAdviceCard.classList.add("hidden"); 
+    elements.liveAiAdvice.textContent = "正在整理复盘建议...";
     elements.liveDetails.classList.add("hidden");
     elements.liveReportMeta.textContent = "开始后，系统会随着截图不断更新总览结果。";
     elements.liveReportTags.innerHTML = "";
@@ -696,6 +700,13 @@
         `<span class="tag">总处理耗时 ${escapeHtml(summary.processing_ms ?? 0)} ms</span>`,
       ].join("");
     }
+    if (payload.ai_advice) {
+        elements.aiAdviceCard.classList.remove("hidden");
+        elements.liveAiAdvice.textContent = payload.ai_advice;
+    } else {
+        // 如果后端还没生成好（比如还没点结束），就先隐藏
+        elements.aiAdviceCard.classList.add("hidden");
+    }
   }
 
   async function requestScreenStream() {
@@ -772,7 +783,7 @@
       const formData = new FormData();
       formData.append("screenshot", blob, filename);
 
-      const response = await fetch(`/api/session/${state.sessionId}/frame`, {
+const response = await fetch(`/api/session/${state.sessionId}/frame`, {
         method: "POST",
         body: formData,
       });
@@ -787,6 +798,31 @@
       }
 
       state.captureInFlight = false;
+
+// ==========================================
+      // 【新增】：高/中监控模式下，触发分心提醒与音效
+      // ==========================================
+if (payload.should_alert) {
+         // 1. 播放警告音效 
+         playAlertSound(); 
+         
+         // 2. 尝试触发桌面级系统通知 (如果没被系统拦截的话)
+         if ("Notification" in window && Notification.permission === "granted") {
+            new Notification("⚠️ 专注偏离警告", {
+               body: "系统检测到你当前页面偏离了目标，请立刻回到专注状态！",
+               requireInteraction: true 
+            });
+         }
+         
+         // 3. 【终极保险】调用浏览器原生强制弹窗，这个绝对 100% 弹出！
+         // 加上 setTimeout 是为了防止阻塞系统通知和音效的执行
+         setTimeout(() => {
+             window.alert("⚠️ 警告：系统检测到你当前页面偏离了目标，请立刻回到专注状态！");
+         }, 100);
+         
+         // 4. 顶部 UI 保留红字历史记录
+         setMessage("error", "⚠️ 刚才系统检测到你偏离了目标，请保持专注！");
+      }
       renderSessionPayload(payload);
       if (payload.session.status === "completed" || Number(payload.session.remaining_seconds || 0) <= 0) {
         await completeSession("finished", true);
@@ -818,8 +854,12 @@
       setMessage("error", "请先填写本次专注目标。");
       return;
     }
+    if ("Notification" in window && Notification.permission !== "granted") {
+      await Notification.requestPermission();
+    }
 
     const durationMinutes = parseDurationInput();
+    const monitoringMode = document.getElementById("liveMonitoringMode") ? document.getElementById("liveMonitoringMode").value : "medium";
     state.starting = true;
     state.finishing = false;
     state.captureInFlight = false;
@@ -844,6 +884,7 @@
         body: JSON.stringify({
           goal,
           duration_minutes: durationMinutes,
+          monitoring_mode: monitoringMode
         }),
       });
       const payload = await parseJson(response);
@@ -868,8 +909,8 @@
       cleanupTimers();
       state.running = false;
       state.captureInFlight = false;
-    state.firstFrameReady = false;
-    state.session = null;
+      state.firstFrameReady = false;
+      state.session = null;
       state.latestPayload = null;
       state.sessionId = "";
       resetLiveStatus();
@@ -945,7 +986,49 @@
   resetLiveStatus();
   setControls(false);
 })();
+// 【新增】浏览器原生蜂鸣警报音生成器（无需外部 mp3 文件）
+function playAlertSound() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    
+    osc.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    
+    osc.type = 'square'; // 方波，听起来更有电子警告感
+    osc.frequency.setValueAtTime(600, ctx.currentTime); // 声音频率
+    gainNode.gain.setValueAtTime(0.1, ctx.currentTime); // 音量大小 (0.1 比较柔和，不会吓一跳)
+    
+    osc.start();
+    osc.stop(ctx.currentTime + 0.3); // 响 0.3 秒后停止
+  } catch (e) {
+    console.warn("浏览器拦截了自动播放音效，或不支持 Audio API", e);
+  }
+}
 
+  const quickGoalTags = document.querySelectorAll('.quick-goal-tag');
+  const actualGoalInput = document.getElementById('liveGoal'); // 准确获取你的输入框
+
+  if (quickGoalTags.length > 0 && actualGoalInput) {
+    quickGoalTags.forEach(tag => {
+      tag.addEventListener('click', (e) => {
+        // 获取标签里的文字
+        const text = e.target.textContent;
+        // 填入目标输入框
+        actualGoalInput.value = text;
+        
+        // 视觉反馈：让输入框亮一下
+        actualGoalInput.style.transition = "box-shadow 0.3s ease";
+        actualGoalInput.style.boxShadow = "0 0 0 3px rgba(31, 103, 98, 0.2)";
+        setTimeout(() => {
+          actualGoalInput.style.boxShadow = "none";
+        }, 400);
+      });
+    });
+  }
 
 
 

@@ -513,7 +513,9 @@ label > span {
 
 textarea,
 input[type="text"],
-input[type="file"] {
+input[type="file"],
+input[type="number"],
+select {
   width: 100%;
   min-height: 54px;
   padding: 12px 14px;
@@ -534,6 +536,8 @@ textarea {
 textarea:focus,
 input[type="text"]:focus,
 input[type="file"]:focus,
+input[type="number"]:focus,
+select:focus,
 details summary:focus,
 button:focus,
 .button:focus {
@@ -1365,7 +1369,8 @@ button:hover {
 textarea,
 input[type="text"],
 input[type="file"],
-input[type="number"] {
+input[type="number"],
+select {
   border: 1px solid rgba(19, 40, 61, 0.08);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(241, 248, 252, 0.78));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78), 0 10px 24px rgba(33, 66, 96, 0.05);
@@ -1661,7 +1666,8 @@ button:hover {
 textarea,
 input[type="text"],
 input[type="file"],
-input[type="number"] {
+input[type="number"],
+select {
   border: 1px solid rgba(36, 51, 50, 0.08);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(251, 246, 239, 0.76));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76), 0 10px 24px rgba(78, 53, 29, 0.04);
@@ -1751,4 +1757,78 @@ button:focus,
   opacity: 0 !important;
   pointer-events: none !important;
   overflow: hidden !important;
+}
+/* AI 寄语卡片专属样式 */
+.ai-advice-card {
+  background: linear-gradient(135deg, rgba(31, 103, 98, 0.08), rgba(212, 162, 75, 0.12)) !important;
+  border: 1px solid rgba(31, 103, 98, 0.2) !important;
+  padding: 24px !important;
+  animation: slideInUp 0.6s ease-out;
+}
+
+.ai-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.ai-icon {
+  font-size: 1.4rem;
+}
+
+.ai-title {
+  font-weight: 800;
+  color: var(--teal-deep);
+  font-size: 1.1rem;
+  letter-spacing: 0.05em;
+}
+
+.ai-content {
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: var(--ink);
+  margin: 0;
+  font-style: italic; 
+
+}
+
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.quick-goals-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+  margin-bottom: 20px;
+}
+
+.quick-goal-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  font-size: 0.9rem;
+  color: var(--teal-deep, #1f6762);
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(31, 103, 98, 0.15);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  user-select: none;
+}
+
+.quick-goal-tag:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(31, 103, 98, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(31, 103, 98, 0.08);
+  color: var(--ink);
+}
+
+.quick-goal-tag:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
